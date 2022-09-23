@@ -16,10 +16,13 @@
 # limitations under the License.
 #
 
-#Set default API key for virustotal API3, IOC file name and score threshold
+
+#Set default API key for virustotal API3, IOC file name, score threshold and API key list for bypassing query limitations
 APIKEY=
 FILE_NAME=ioc.txt
 THRESHOLD=5
+APIKEYS=()
+
 
 #Import API key for virustotal API3 and IOC file name
 while getopts ":f:k:t:" arg; do
@@ -29,8 +32,8 @@ while getopts ":f:k:t:" arg; do
 		t) THRESHOLD="$OPTARG";;
 		?) echo "Invalid arguments"; exit 1;;
 	esac
-	IOCS=$(pwd)/"$FILE_NAME"
 done
+IOCS=$(pwd)/"$FILE_NAME"
 
 
 #Defang the IoC in the output csv file
@@ -102,10 +105,15 @@ terminal_output() {
 
 #IOCS processing for validation
 ioc_processing() {
-	for i in $(cat $IOCS)
+	j=0
+	while read i
 	do
 		if [[ $i =~ $url_check ]]; then
 			base_value=$(echo $i | base64 -w0 | tr '+/' '-_' | tr -d '=')
+			((j++))
+			if [[ ${#APIKEYS[@]} != 0 ]]; then
+				APIKEY=${APIKEYS[j%10]}
+			fi
 			virustotal_out=$(virustotal_call urls $base_value)
 			analysis_scores
 			terminal_output $i $malicious $(($malicious + $harmless + $suspicious + $undetected))
@@ -113,6 +121,10 @@ ioc_processing() {
 				echo $i "," $malicious "out of" $(($malicious + $harmless + $suspicious + $undetected)) "," "Target is URL" >> $OUTPUT
 			fi
 		elif [[ $i =~ $domain_check ]]; then
+			((j++))
+			if [[ ${#APIKEYS[@]} != 0 ]]; then
+				APIKEY=${APIKEYS[j%10]}
+			fi
 			virustotal_out=$(virustotal_call domains $i)
 			analysis_scores
 			terminal_output $i $malicious $(($malicious + $harmless + $suspicious + $undetected))
@@ -120,6 +132,10 @@ ioc_processing() {
 				echo $i "," $malicious "out of" $(($malicious + $harmless + $suspicious + $undetected)) "," "Target is DOMAIN" >> $OUTPUT
 			fi
 		elif [[ $i =~ $ip_check ]]; then
+			((j++))
+			if [[ ${#APIKEYS[@]} != 0 ]]; then
+				APIKEY=${APIKEYS[j%10]}
+			fi
 			virustotal_out=$(virustotal_call ip_addresses $i)
 			analysis_scores
 			terminal_output $i $malicious $(($malicious + $harmless + $suspicious + $undetected))
@@ -127,6 +143,10 @@ ioc_processing() {
 				echo $i "," $malicious "out of" $(($malicious + $harmless + $suspicious + $undetected)) "," "Target is IP Address" >> $OUTPUT
 			fi
 		elif [[ $i =~ $hash_check ]]; then
+			((j++))
+			if [[ ${#APIKEYS[@]} != 0 ]]; then
+				APIKEY=${APIKEYS[j%10]}
+			fi
 			virustotal_out=$(virustotal_call files $i)
 			analysis_scores
 			multi_shas
@@ -137,7 +157,7 @@ ioc_processing() {
 		else
 			echo $i >> $OUTPUT
 		fi
-	done
+	done < $IOCS
 }
 
 

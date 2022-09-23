@@ -5,7 +5,7 @@ and get output in a .csv file in defanged format.
 
 ## Usage
 
-**Add APIKEY and IoC file name in script**
+**Add APIKEY, IoC file name and malicious threshold in script**
 
 ```
 bash ioc_validator.sh
@@ -13,9 +13,9 @@ bash ioc_validator.sh
 Default IoC filename is ioc.txt.
 
 
-**For custom APIKEY and IoC file name**
+**For custom APIKEY, IoC file name and Malicious threshold**
 ```
-bash ioc_validator.sh -k <APIKEY> -f <ioc_filename>
+bash ioc_validator.sh -k <APIKEY> -f <ioc_filename> -t <malicious_threshold>
 ```
 
 
