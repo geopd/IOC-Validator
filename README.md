@@ -15,7 +15,7 @@ Default IoC filename is ioc.txt.
 
 **For custom APIKEY, IoC file name and Malicious threshold**
 ```
-bash ioc_validator.sh -k <APIKEY> -f <ioc_filename> -t <malicious_threshold>
+bash ioc_validator.sh -v <VIRUS_APIKEY> -f <ioc_filename> -t <malicious_threshold>
 ```
 
 

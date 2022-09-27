@@ -18,17 +18,17 @@
 
 
 #Set default API key for virustotal API3, IOC file name, score threshold and API key list for bypassing query limitations
-APIKEY=
+VIRUS_APIKEY=
 FILE_NAME=ioc.txt
 THRESHOLD=5
-APIKEYS=()
+VIRUS_APIKEYS=()
 
 
 #Import API key for virustotal API3 and IOC file name
-while getopts ":f:k:t:" arg; do
+while getopts ":f:v:t:" arg; do
 	case $arg in
 		f) FILE_NAME="$OPTARG";;
-		k) APIKEY="$OPTARG";;
+		v) VIRUS_APIKEY="$OPTARG";;
 		t) THRESHOLD="$OPTARG";;
 		?) echo "Invalid arguments"; exit 1;;
 	esac
@@ -63,7 +63,8 @@ regrex_patterns() {
 #Generate .csv result as output
 output_generation() {
 	mkdir -p $(pwd)/Results
-	OUTPUT=$(pwd)/Results/ioc_validation_$(date +"%d%m%Y_%H%M%S").csv
+    FILE_BASE=$(basename -s .txt $IOCS)
+	OUTPUT=$(pwd)/Results/$FILE_BASE_$(date +"%d%m%Y_%H%M%S").csv
 	touch $OUTPUT
 }
 
@@ -72,7 +73,7 @@ output_generation() {
 virustotal_call(){
 	curl -s --request GET \
 		--url "https://www.virustotal.com/api/v3/"$1"/"$2"" \
-		--header "x-apikey: $APIKEY"
+		--header "x-apikey: $VIRUS_APIKEY"
 }
 
 
@@ -94,7 +95,7 @@ multi_shas() {
 
 
 #Terminal output for users
-terminal_output() {
+virustotal_terminal_output() {
 	echo "----------------------------------------------------------------"
 	echo $1
 	echo "----------------------------------------------------------------"
@@ -111,46 +112,46 @@ ioc_processing() {
 		if [[ $i =~ $url_check ]]; then
 			base_value=$(echo $i | base64 -w0 | tr '+/' '-_' | tr -d '=')
 			((j++))
-			if [[ ${#APIKEYS[@]} != 0 ]]; then
-				APIKEY=${APIKEYS[j%10]}
+			if [[ ${#VIRUS_APIKEYS[@]} != 0 ]]; then
+				VIRUS_APIKEY=${VIRUS_APIKEYS[j%10]}
 			fi
 			virustotal_out=$(virustotal_call urls $base_value)
 			analysis_scores
-			terminal_output $i $malicious $(($malicious + $harmless + $suspicious + $undetected))
+			virustotal_terminal_output $i $malicious $(($malicious + $harmless + $suspicious + $undetected))
 			if [[ $malicious -ge $THRESHOLD ]]; then
 				echo $i "," $malicious "out of" $(($malicious + $harmless + $suspicious + $undetected)) "," "Target is URL" >> $OUTPUT
 			fi
 		elif [[ $i =~ $domain_check ]]; then
 			((j++))
-			if [[ ${#APIKEYS[@]} != 0 ]]; then
-				APIKEY=${APIKEYS[j%10]}
+			if [[ ${#VIRUS_APIKEYS[@]} != 0 ]]; then
+				VIRUS_APIKEY=${VIRUS_APIKEYS[j%10]}
 			fi
 			virustotal_out=$(virustotal_call domains $i)
 			analysis_scores
-			terminal_output $i $malicious $(($malicious + $harmless + $suspicious + $undetected))
+			virustotal_terminal_output $i $malicious $(($malicious + $harmless + $suspicious + $undetected))
 			if [[ $malicious -ge $THRESHOLD ]]; then
 				echo $i "," $malicious "out of" $(($malicious + $harmless + $suspicious + $undetected)) "," "Target is DOMAIN" >> $OUTPUT
 			fi
 		elif [[ $i =~ $ip_check ]]; then
 			((j++))
-			if [[ ${#APIKEYS[@]} != 0 ]]; then
-				APIKEY=${APIKEYS[j%10]}
+			if [[ ${#VIRUS_APIKEYS[@]} != 0 ]]; then
+				VIRUS_APIKEY=${VIRUS_APIKEYS[j%10]}
 			fi
 			virustotal_out=$(virustotal_call ip_addresses $i)
 			analysis_scores
-			terminal_output $i $malicious $(($malicious + $harmless + $suspicious + $undetected))
+			virustotal_terminal_output $i $malicious $(($malicious + $harmless + $suspicious + $undetected))
 			if [[ $malicious -ge $THRESHOLD ]]; then
 				echo $i "," $malicious "out of" $(($malicious + $harmless + $suspicious + $undetected)) "," "Target is IP Address" >> $OUTPUT
 			fi
 		elif [[ $i =~ $hash_check ]]; then
 			((j++))
-			if [[ ${#APIKEYS[@]} != 0 ]]; then
-				APIKEY=${APIKEYS[j%10]}
+			if [[ ${#VIRUS_APIKEYS[@]} != 0 ]]; then
+				VIRUS_APIKEY=${VIRUS_APIKEYS[j%10]}
 			fi
 			virustotal_out=$(virustotal_call files $i)
 			analysis_scores
 			multi_shas
-			terminal_output $i $malicious $(($malicious + $harmless + $suspicious + $undetected))
+			virustotal_terminal_output $i $malicious $(($malicious + $harmless + $suspicious + $undetected))
 			if [[ $malicious -ge $THRESHOLD ]]; then
 				echo $i "," $md5_out "," $sha1_out "," $sha256_out "," $malicious "out of" $(($malicious + $harmless + $suspicious + $undetected)) "," "Target is HASH" >> $OUTPUT
 			fi
