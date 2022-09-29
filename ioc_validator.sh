@@ -17,18 +17,21 @@
 #
 
 
-#Set default API key for virustotal API3, IOC file name, score threshold and API key list for bypassing query limitations
+#Set default API key for virustotal API3, API key for AbuseIPDB, IOC file name, score threshold and API key list for bypassing query limitations
 VIRUS_APIKEY=
+ABUSE_APIKEY=
 FILE_NAME=ioc.txt
-THRESHOLD=5
+THRESHOLD=0
 VIRUS_APIKEYS=()
 
 
 #Import API key for virustotal API3 and IOC file name
-while getopts ":f:v:t:" arg; do
+while getopts ":f:s:v:a:t:" arg; do
 	case $arg in
 		f) FILE_NAME="$OPTARG";;
+		s) SERVICE_TYPE="$OPTARG";;
 		v) VIRUS_APIKEY="$OPTARG";;
+		a) ABUSE_APIKEY="$OPTARG";;
 		t) THRESHOLD="$OPTARG";;
 		?) echo "Invalid arguments"; exit 1;;
 	esac
@@ -63,8 +66,8 @@ regrex_patterns() {
 #Generate .csv result as output
 output_generation() {
 	mkdir -p $(pwd)/Results
-    FILE_BASE=$(basename -s .txt $IOCS)
-	OUTPUT=$(pwd)/Results/$FILE_BASE_$(date +"%d%m%Y_%H%M%S").csv
+	FILEBASE=$(basename -s .txt $IOCS)
+	OUTPUT=$(pwd)/Results/${FILEBASE}_$(date +"%d%m%Y_%H%M%S").csv
 	touch $OUTPUT
 }
 
@@ -74,6 +77,16 @@ virustotal_call(){
 	curl -s --request GET \
 		--url "https://www.virustotal.com/api/v3/"$1"/"$2"" \
 		--header "x-apikey: $VIRUS_APIKEY"
+}
+
+
+#AbuseIPDB API
+abuseipdb_call() {
+	curl -s -G https://api.abuseipdb.com/api/v2/check \
+		--data-urlencode """ipAddress=$i""" \
+		-d verbose \
+		-H "Key: $ABUSE_APIKEY" \
+		-H "Accept: application/json"
 }
 
 
@@ -101,6 +114,15 @@ virustotal_terminal_output() {
 	echo "----------------------------------------------------------------"
 	echo "VirusTotal:" $2 "out of" $3
 	echo ""
+}
+
+abuseipdb_terminal_output() {
+		echo "-----------------------"
+		echo $1
+		echo "-----------------------"
+		echo "Domain:" $2
+		echo "abuseConfidenceScore:" $3
+		echo ""
 }
 
 
@@ -162,13 +184,38 @@ ioc_processing() {
 }
 
 
+#IP processing for validation in AbuseIPDB
+ip_processing() {
+	echo "IP Address" "," "ISP" "," "Domain" "," "abuseConfidenceScore" >> $OUTPUT
+	while read i
+	do
+		if [[ $i =~ $ip_check ]]; then
+			abuseipdb_out=$(abuseipdb_call $i)
+			abuse_score=$(echo $abuseipdb_out | jq -r '.data.abuseConfidenceScore')
+			abuse_domain=$(echo $abuseipdb_out | jq -r '.data.domain')
+			abuse_isp=$(echo $abuseipdb_out | jq -r '.data.isp')
+			abuseipdb_terminal_output $i $abuse_domain $abuse_score
+			if [[ $abuse_score -ge $THRESHOLD ]]; then
+				echo $i "," $abuse_isp "," $abuse_domain "," $abuse_score >> $OUTPUT
+			fi
+		fi
+	done < $IOCS
+}
+
+
 #Final IOC Validation moments
 validation_moments() {
 	fang
 	regrex_patterns
 	output_generation
-	ioc_processing
-	defang
+	if [ $SERVICE_TYPE = virustotal ]; then
+		ioc_processing
+	elif [ $SERVICE_TYPE = abuseipdb ]; then
+		ip_processing
+	fi
+	if [ $SERVICE_TYPE = virustotal ]; then
+		defang
+	fi
 }
 
 validation_moments
