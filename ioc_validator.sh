@@ -55,10 +55,11 @@ fang() {
 
 #Regrex patterns for IP, URL, DOMAIN and HASH match.
 regrex_patterns() {
-	ip_check="(\b25[0-5]|\b2[0-4][0-9]|\b[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}"
+	ip_check="^(\b25[0-5]|\b2[0-4][0-9]|\b[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$"
 	url_check="https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)"
 	domain_check="(([\da-zA-Z])([_\w-]{,62})\.){,127}(([\da-zA-Z])[_\w-]{,61})?([\da-zA-Z]\.((xn\-\-[a-zA-Z\d]+)|([a-zA-Z\d]{2,})))"
 	hash_check="^[A-Fa-f0-9]{32,64}$"
+	name_check="(^[A-Za-z]+[\ A-Za-z]+)$"
 }
 
 
@@ -177,8 +178,8 @@ ioc_processing() {
 			if [[ $malicious -ge $THRESHOLD ]]; then
 				echo $i "," $md5_out "," $sha1_out "," $sha256_out "," $malicious "out of" $(($malicious + $harmless + $suspicious + $undetected)) "," "Target is HASH" >> $OUTPUT
 			fi
-		else
-			echo $i >> $OUTPUT
+		elif [[ $i =~ $name_check ]]; then
+			echo $i "," "#########" "," "#########" "," "#########" >> $OUTPUT
 		fi
 	done < $IOCS
 }
