@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# Copyright (C) 2022 GeoPD <geoemmanuelpd2001@gmail.com>
+# Copyright (C) 2023 GeoPD <geoemmanuelpd2001@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,6 +38,50 @@ while getopts ":f:s:v:a:t:" arg; do
 done
 IOCS=$(pwd)/"$FILE_NAME"
 
+# Prompt for user input for variables
+initialize_vars () {
+	if [ -z "$SERVICE_TYPE" ]; then
+		read -p "Enter service name(abuseipdb / virustotal): " SERVICE_TYPE
+	fi
+
+	if [ "$SERVICE_TYPE" = "abuseipdb" ]; then
+		if [ -z "$ABUSE_APIKEY" ]; then
+			read -p "Enter AbuseIPDB API key: " API_KEY
+
+			if [[ $API_KEY =~ [a-z0-9]{80} ]]; then
+				ABUSE_APIKEY="$API_KEY"
+			else
+				echo "Invalid AbuseIPDB API key. Exiting script."
+				exit 1
+			fi
+		fi
+	elif [ "$SERVICE_TYPE" = "virustotal" ]; then
+		if [ -z "$ABUSE_APIKEY" ]; then
+			read -p "Provide VirusTotal API key: " API_KEY
+			if [[ $API_KEY =~ [a-z0-9]{64} ]]; then
+				VIRUS_APIKEY="$API_KEY"
+			else
+				echo "Invalid VirusTotal API key. Exiting script."
+				exit 1
+			fi
+		fi
+	else
+		echo "Invalid service name. Exiting script."
+		exit 1
+	fi
+
+	if [ -f "ioc.txt" ]; then
+		read -p "Use IOCs in ioc.txt? [y/n] " use_iocs
+		use_iocs=$(echo "${use_iocs:-y}" | tr '[:upper:]' '[:lower:]')
+	else
+		use_iocs="n"
+	fi
+
+	if [ "$use_iocs" = "n" ]; then
+		echo "Provide IOCs. Press Enter; then Ctrl+D to save."
+		cat > ioc.txt
+	fi
+}
 
 #Defang the IoC in the output csv file
 defang() {
@@ -187,25 +231,34 @@ ioc_processing() {
 
 #IP processing for validation in AbuseIPDB
 ip_processing() {
-	echo "IP Address" "," "ISP" "," "Domain" "," "abuseConfidenceScore" >> $OUTPUT
+	echo "IP Address" "," "ISP" "," "Usage Type" "," "Domain" "," "Country" "," "abuseConfidenceScore" >> $OUTPUT
 	while read i
 	do
 		if [[ $i =~ $ip_check ]]; then
 			abuseipdb_out=$(abuseipdb_call $i)
 			abuse_score=$(echo $abuseipdb_out | jq -r '.data.abuseConfidenceScore')
-			abuse_domain=$(echo $abuseipdb_out | jq -r '.data.domain')
 			abuse_isp=$(echo $abuseipdb_out | jq -r '.data.isp')
+			abuse_usagetype=$(echo $abuseipdb_out | jq -r '.data.usageType')
+			abuse_domain=$(echo $abuseipdb_out | jq -r '.data.domain')
+			abuse_country=$(echo $abuseipdb_out | jq -r '.data.countryName')
+
 			abuseipdb_terminal_output $i $abuse_domain $abuse_score
 			if [[ $abuse_score -ge $THRESHOLD ]]; then
-				echo $i "," $abuse_isp "," $abuse_domain "," $abuse_score >> $OUTPUT
+				echo $i "," $abuse_isp "," $abuse_usagetype "," $abuse_domain "," $abuse_country "," $abuse_score >> $OUTPUT
 			fi
 		fi
 	done < $IOCS
 }
 
+cloudshell_download() {
+    if which cloudshell >/dev/null 2>&1; then
+        cloudshell download "$OUTPUT"
+    fi
+}
 
 #Final IOC Validation moments
 validation_moments() {
+	initialize_vars
 	fang
 	regrex_patterns
 	output_generation
@@ -217,6 +270,7 @@ validation_moments() {
 	if [ $SERVICE_TYPE = virustotal ]; then
 		defang
 	fi
+	cloudshell_download
 }
 
 validation_moments
